@@ -4212,6 +4212,7 @@ public:
 
  /* Needed for partition / spider */
   virtual TABLE_LIST *get_next_global_for_child() { return NULL; }
+  virtual void check_and_set_bitmap_for_update(bool rnd) { return; };
 
  /**
    Part of old, deprecated in-place ALTER API.
