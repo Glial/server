@@ -1029,7 +1029,7 @@ void Field::make_sort_key(uchar *buff,uint length)
 }
 
 
-uchar* Field::make_sort_key_ext(uchar *buff,uint length)
+uchar* Field::make_packed_sort_key(uchar *buff,uint length)
 {
   if (maybe_null())
   {
@@ -1045,8 +1045,8 @@ uchar* Field::make_sort_key_ext(uchar *buff,uint length)
 }
 
 
-uchar* Field_longstr::make_sort_key_ext(uchar *buff,
-                                        uint length __attribute__((unused)))
+uchar* Field_longstr::make_packed_sort_key(uchar *buff,
+                                          uint length __attribute__((unused)))
 {
   if (maybe_null())
   {
@@ -8534,8 +8534,10 @@ Binlog_type_info Field_blob::binlog_type_info() const
 
 uint32 Field_blob::sort_length() const
 {
-  return (uint32) (get_thd()->variables.max_sort_length + 
-                   (field_charset() == &my_charset_bin ? 0 : packlength));
+  return packlength == 4 ?
+    UINT_MAX32 :
+    (uint32) field_length + (field_charset() == &my_charset_bin ?
+                             0 : packlength);
 }
 
 

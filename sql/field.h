@@ -1410,8 +1410,16 @@ public:
     return bytes;
   }
 
+  /*
+    Create mem-comparable sort keys
+  */
   void make_sort_key(uchar *buff, uint length);
-  virtual uchar* make_sort_key_ext(uchar *buff, uint length);
+
+  /*
+    create a compact sort key which can be compared with a comparison
+    function. They are called packed sort keys
+  */
+  virtual uchar* make_packed_sort_key(uchar *buff, uint length);
   virtual int compare_packed_keys(uchar *a, size_t *a_len,
                                   uchar *b, size_t *b_len,
                                   SORT_FIELD *sortorder) const;
@@ -2148,7 +2156,7 @@ public:
   int compare_packed_keys(uchar *a, size_t *a_len,
                           uchar *b, size_t *b_len,
                           SORT_FIELD *sortorder)const override;
-  uchar* make_sort_key_ext(uchar *buff, uint length)override;
+  uchar* make_packed_sort_key(uchar *buff, uint length)override;
 };
 
 /* base class for float and double and decimal (old one) */

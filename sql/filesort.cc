@@ -1300,7 +1300,7 @@ static uint make_sortkey(Sort_param *param, uchar *to, uchar *ref_pos)
     if ((field=sort_field->field))
     {						// Field
       if (using_packed_sortkeys)
-        end= field->make_sort_key_ext(to, sort_field->length);
+        end= field->make_packed_sort_key(to, sort_field->length);
       else
       {
         field->make_sort_key(to, sort_field->length);
@@ -1312,8 +1312,8 @@ static uint make_sortkey(Sort_param *param, uchar *to, uchar *ref_pos)
     {						// Item
       Item *item= sort_field->item;
       if (using_packed_sortkeys)
-        end= item->type_handler()->make_sort_key_ext(to, sort_field->item,
-                                                     sort_field, param);
+        end= item->type_handler()->make_packed_sort_key(to, sort_field->item,
+                                                        sort_field, param);
       else
       {
         item->type_handler()->make_sort_key(to, sort_field->item,
@@ -2520,7 +2520,7 @@ SORT_INFO::~SORT_INFO()
 */
 
 uchar*
-Type_handler_string_result::make_sort_key_ext(uchar *to, Item *item,
+Type_handler_string_result::make_packed_sort_key(uchar *to, Item *item,
                                             const SORT_FIELD_ATTR *sort_field,
                                             Sort_param *param) const
 {
@@ -2563,9 +2563,9 @@ Type_handler_string_result::make_sort_key_ext(uchar *to, Item *item,
 
 
 uchar*
-Type_handler_int_result::make_sort_key_ext(uchar *to, Item *item,
-                                           const SORT_FIELD_ATTR *sort_field,
-                                           Sort_param *param) const
+Type_handler_int_result::make_packed_sort_key(uchar *to, Item *item,
+                                            const SORT_FIELD_ATTR *sort_field,
+                                            Sort_param *param) const
 {
   longlong value= item->val_int_result();
   return make_sort_key_longlong_ext(to, item->maybe_null, item->null_value,
@@ -2574,7 +2574,7 @@ Type_handler_int_result::make_sort_key_ext(uchar *to, Item *item,
 
 
 uchar*
-Type_handler_decimal_result::make_sort_key_ext(uchar *to, Item *item,
+Type_handler_decimal_result::make_packed_sort_key(uchar *to, Item *item,
                                             const SORT_FIELD_ATTR *sort_field,
                                             Sort_param *param) const
 {
@@ -2595,7 +2595,7 @@ Type_handler_decimal_result::make_sort_key_ext(uchar *to, Item *item,
 
 
 uchar*
-Type_handler_real_result::make_sort_key_ext(uchar *to, Item *item,
+Type_handler_real_result::make_packed_sort_key(uchar *to, Item *item,
                                             const SORT_FIELD_ATTR *sort_field,
                                             Sort_param *param) const
 {
@@ -2615,7 +2615,7 @@ Type_handler_real_result::make_sort_key_ext(uchar *to, Item *item,
 
 
 uchar*
-Type_handler_temporal_result::make_sort_key_ext(uchar *to, Item *item,
+Type_handler_temporal_result::make_packed_sort_key(uchar *to, Item *item,
                                             const SORT_FIELD_ATTR *sort_field,
                                             Sort_param *param) const
 {
@@ -2637,7 +2637,7 @@ Type_handler_temporal_result::make_sort_key_ext(uchar *to, Item *item,
 
 
 uchar*
-Type_handler_timestamp_common::make_sort_key_ext(uchar *to, Item *item,
+Type_handler_timestamp_common::make_packed_sort_key(uchar *to, Item *item,
                                             const SORT_FIELD_ATTR *sort_field,
                                             Sort_param *param) const
 {
