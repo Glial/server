@@ -29,6 +29,7 @@
 #include "sql_type_string.h"
 #include "sql_type_real.h"
 #include "compat56.h"
+#include "filesort.h"
 C_MODE_START
 #include <ma_dyncol.h>
 C_MODE_END
@@ -3765,12 +3766,19 @@ public:
   /*
     Create mem-comparable sort keys
   */
-  virtual void make_sort_key(uchar *to, Item *item,
+  virtual uint make_sort_key(uchar *to, Item *item,
                              const SORT_FIELD_ATTR *sort_field,
                              Sort_param *param) const= 0;
-  virtual void sortlength(THD *thd,
+  uint make_sort_key(enum sort_method_t order_by_type, uchar *to, Item *item,
+                     const SORT_FIELD_ATTR *sort_field,
+                     Sort_param *param)const;
+
+  virtual void sort_length(THD *thd,
                           const Type_std_attributes *item,
                           SORT_FIELD_ATTR *attr) const= 0;
+  void sort_length(THD *thd, enum sort_method_t order_by_type,
+                   const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr)const;
   virtual bool is_packable() const { return false; }
   virtual int compare_packed_keys(uchar *a, size_t *a_len,
                                   uchar *b, size_t *b_len,
@@ -4174,11 +4182,12 @@ public:
                                    const Bit_addr &bit,
                                    const Column_definition_attributes *attr,
                                    uint32 flags) const override;
-  void make_sort_key(uchar *to, Item *item,
+  uint make_sort_key(uchar *to, Item *item,
                      const SORT_FIELD_ATTR *sort_field,
                      Sort_param *param) const override
   {
     DBUG_ASSERT(0);
+    return 0;
   }
   uchar* make_packed_sort_key(uchar *to, Item *item,
                               const SORT_FIELD_ATTR *sort_field,
@@ -4187,8 +4196,8 @@ public:
     DBUG_ASSERT(0);
     return NULL;
   }
-  void sortlength(THD *thd, const Type_std_attributes *item,
-                            SORT_FIELD_ATTR *attr) const override
+  void sort_length(THD *thd, const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr) const override
   {
     DBUG_ASSERT(0);
   }
@@ -4513,15 +4522,15 @@ public:
   bool subquery_type_allows_materialization(const Item *inner,
                                             const Item *outer)
                                             const override;
-  void make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
+  uint make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
                      Sort_param *param) const override;
   uchar* make_packed_sort_key(uchar *to, Item *item,
                               const SORT_FIELD_ATTR *sort_field,
                               Sort_param *param) const override;
 
-  void sortlength(THD *thd,
-                  const Type_std_attributes *item,
-                  SORT_FIELD_ATTR *attr) const override;
+  void sort_length(THD *thd,
+                   const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr) const override;
   bool Item_const_eq(const Item_const *a, const Item_const *b,
                      bool binary_cmp) const override;
   bool Item_eq_value(THD *thd, const Type_cmp_attributes *attr,
@@ -4624,7 +4633,7 @@ public:
                            bool show_field) const override;
   Field *make_num_distinct_aggregator_field(MEM_ROOT *, const Item *)
     const override;
-  void make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
+  uint make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
                      Sort_param *param) const override;
   uchar* make_packed_sort_key(uchar *to, Item *item,
                               const SORT_FIELD_ATTR *sort_field,
@@ -4638,9 +4647,9 @@ public:
                                           const uchar *buffer,
                                           LEX_CUSTRING *gis_options)
                                           const override;
-  void sortlength(THD *thd,
-                  const Type_std_attributes *item,
-                  SORT_FIELD_ATTR *attr) const override;
+  void sort_length(THD *thd,
+                   const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr) const override;
   uint32 max_display_length(const Item *item) const override;
   uint32 Item_decimal_notation_int_digits(const Item *item) const override;
   Item *create_typecast_item(THD *thd, Item *item,
@@ -4877,7 +4886,7 @@ public:
                           const Record_addr &addr,
                           const Type_all_attributes &attr,
                           TABLE_SHARE *share) const override;
-  void make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
+  uint make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
                      Sort_param *param) const override;
   uchar* make_packed_sort_key(uchar *to, Item *item,
                               const SORT_FIELD_ATTR *sort_field,
@@ -4885,9 +4894,9 @@ public:
   void
   Column_definition_attributes_frm_pack(const Column_definition_attributes *at,
                                         uchar *buff) const override;
-  void sortlength(THD *thd,
-                  const Type_std_attributes *item,
-                  SORT_FIELD_ATTR *attr) const override;
+  void sort_length(THD *thd,
+                   const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr) const override;
   bool Item_const_eq(const Item_const *a, const Item_const *b,
                      bool binary_cmp) const override;
   bool Item_eq_value(THD *thd, const Type_cmp_attributes *attr,
@@ -4987,14 +4996,14 @@ public:
   void
   Column_definition_attributes_frm_pack(const Column_definition_attributes *at,
                                         uchar *buff) const override;
-  void make_sort_key(uchar *to, Item *item,  const SORT_FIELD_ATTR *sort_field,
+  uint make_sort_key(uchar *to, Item *item,  const SORT_FIELD_ATTR *sort_field,
                      Sort_param *param) const override;
   uchar* make_packed_sort_key(uchar *to, Item *item,
                               const SORT_FIELD_ATTR *sort_field,
                               Sort_param *param) const override;
-  void sortlength(THD *thd,
-                  const Type_std_attributes *item,
-                  SORT_FIELD_ATTR *attr) const override;
+  void sort_length(THD *thd,
+                   const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr) const override;
   bool Item_const_eq(const Item_const *a, const Item_const *b,
                      bool binary_cmp) const override;
   bool Item_param_set_from_value(THD *thd,
@@ -5079,14 +5088,14 @@ public:
   const Type_handler *
   type_handler_adjusted_to_max_octet_length(uint max_octet_length,
                                             CHARSET_INFO *cs) const override;
-  void make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
+  uint make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
                      Sort_param *param) const override;
   uchar* make_packed_sort_key(uchar *to, Item *item,
                               const SORT_FIELD_ATTR *sort_field,
                               Sort_param *param) const override;
-  void sortlength(THD *thd,
-                  const Type_std_attributes *item,
-                  SORT_FIELD_ATTR *attr) const override;
+  void sort_length(THD *thd,
+                   const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr) const override;
   int compare_packed_keys(uchar *a, size_t *a_len,
                           uchar *b, size_t *b_len,
                           SORT_FIELD *sortorder) const override;
@@ -6282,14 +6291,14 @@ public:
   cmp_item *make_cmp_item(THD *thd, CHARSET_INFO *cs) const override;
   in_vector *make_in_vector(THD *thd, const Item_func_in *f, uint nargs)
                             const override;
-  void make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
+  uint make_sort_key(uchar *to, Item *item, const SORT_FIELD_ATTR *sort_field,
                      Sort_param *param) const override;
   uchar* make_packed_sort_key(uchar *to, Item *item,
                               const SORT_FIELD_ATTR *sort_field,
                               Sort_param *param) const override;
-  void sortlength(THD *thd,
-                  const Type_std_attributes *item,
-                  SORT_FIELD_ATTR *attr) const override;
+  void sort_length(THD *thd,
+                   const Type_std_attributes *item,
+                   SORT_FIELD_ATTR *attr) const override;
   bool Column_definition_fix_attributes(Column_definition *c) const override;
   uint Item_decimal_scale(const Item *item) const override
   {

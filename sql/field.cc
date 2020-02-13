@@ -1014,50 +1014,79 @@ CPP_UNNAMED_NS_END
 *****************************************************************************/
 
 
-void Field::make_sort_key(uchar *buff,uint length)
+uint Field::make_sort_key(uchar *buff,uint length)
 {
   if (maybe_null())
   {
     if (is_null())
     {
       bzero(buff, length + 1);
-      return;
+      return length;
     }
     *buff++= 1;
   }
   sort_string(buff, length);
+  return length;
 }
 
 
-uchar* Field::make_packed_sort_key(uchar *buff,uint length)
+/*
+  Makes the sort key for a column of a table
+
+  @param  order_by_type  type in which values are written to buffer
+  @param  buff           buffer where values are written
+  @param  length         max length to which values are written
+
+  @retval
+    length of the bytes written, does not include the NULL bytes
+*/
+
+uint
+Field::make_sort_key(enum sort_method_t order_by_type,
+                     uchar *buff, SORT_FIELD_ATTR *sort_field)
+{
+  switch (order_by_type)
+  {
+    case ORDER_BY_STRXFRM:
+      return make_sort_key(buff, sort_field->length);
+    case ORDER_BY_ORIGINAL:
+      return make_packed_sort_key(buff, sort_field->length);
+    default:
+      DBUG_ASSERT(0);
+      break;
+  }
+  return 0;
+}
+
+uint Field::make_packed_sort_key(uchar *buff,uint length)
 {
   if (maybe_null())
   {
     if (is_null())
     {
       *buff++= 0;
-      return buff;
+      return 0;
     }
     *buff++=1;
   }
   sort_string(buff, length);
-  return buff+length;
+  return length;
 }
 
 
-uchar* Field_longstr::make_packed_sort_key(uchar *buff,
-                                          uint length __attribute__((unused)))
+uint Field_longstr::make_packed_sort_key(uchar *buff, uint length)
 {
   if (maybe_null())
   {
     if (is_null())
     {
       *buff++= 0;
-      return buff;
+      return 0;
     }
     *buff++=1;
   }
-  return pack(buff, ptr);
+  uchar *end= pack(buff, ptr);
+  return static_cast<int>(end-buff);
 }
 
 /**

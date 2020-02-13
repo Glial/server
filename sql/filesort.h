@@ -31,6 +31,14 @@ class JOIN;
 class Addon_fields;
 class Sort_keys;
 
+
+enum sort_method_t
+{
+  ORDER_BY_STRXFRM,
+  ORDER_BY_ORIGINAL,
+  ORDER_BY_ORIGINAL_TRUNCATION
+};
+
 /**
   Sorting related info.
   To be extended by another WL to include complete filesort implementation.

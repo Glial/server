@@ -33,6 +33,7 @@
 #include "compat56.h"
 #include "sql_type.h"                           /* Type_std_attributes */
 #include "field_comp.h"
+#include "filesort.h"
 
 class Send_field;
 class Copy_field;
@@ -1413,13 +1414,15 @@ public:
   /*
     Create mem-comparable sort keys
   */
-  void make_sort_key(uchar *buff, uint length);
+  uint make_sort_key(uchar *buff, uint length);
+  uint make_sort_key(enum sort_method_t order_by_type,
+                     uchar *buff, uint length);
 
   /*
     create a compact sort key which can be compared with a comparison
     function. They are called packed sort keys
   */
-  virtual uchar* make_packed_sort_key(uchar *buff, uint length);
+  virtual uint make_packed_sort_key(uchar *buff, uint length);
   virtual int compare_packed_keys(uchar *a, size_t *a_len,
                                   uchar *b, size_t *b_len,
                                   SORT_FIELD *sortorder) const;
@@ -2156,7 +2159,7 @@ public:
   int compare_packed_keys(uchar *a, size_t *a_len,
                           uchar *b, size_t *b_len,
                           SORT_FIELD *sortorder)const override;
-  uchar* make_packed_sort_key(uchar *buff, uint length)override;
+  uint make_packed_sort_key(uchar *buff, uint length)override;
 };
 
 /* base class for float and double and decimal (old one) */

@@ -324,6 +324,7 @@ private:
   uint size_of_packable_fields;     // Total length bytes for packable columns
   // orignal sort length when we store real values for sort key
   uint sort_length;
+  enum sort_method_t order_by_type;
 };
 
 

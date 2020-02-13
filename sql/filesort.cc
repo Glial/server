@@ -1042,7 +1042,29 @@ void store_length(uchar *to, uint length, uint pack_length)
 }
 
 
-void
+
+uint
+Type_handler::make_sort_key(enum sort_method_t order_by_type, uchar *to,
+                            Item *item, const SORT_FIELD_ATTR *sort_field,
+                            Sort_param *param) const
+{
+  switch (order_by_type)
+  {
+    case ORDER_BY_STRXFRM:
+      make_sort_key(to, item, sort_field, param);
+      break;
+    case ORDER_BY_ORIGINAL:
+      make_packed_sort_key(to, item, sort_field, param);
+      break;
+    default:
+      DBUG_ASSERT(0);
+      break;
+  }
+  return 0;
+}
+
+
+uint
 Type_handler_string_result::make_sort_key(uchar *to, Item *item,
                                           const SORT_FIELD_ATTR *sort_field,
                                           Sort_param *param) const
@@ -1074,7 +1096,7 @@ Type_handler_string_result::make_sort_key(uchar *to, Item *item,
       memset(to, 0, sort_field->length);	// Avoid crash
       /* purecov: end */
     }
-    return;
+    return sort_field->length;
   }
 
   if (use_strnxfrm(cs))
@@ -1111,10 +1133,11 @@ Type_handler_string_result::make_sort_key(uchar *to, Item *item,
     char fill_char= ((cs->state & MY_CS_BINSORT) ? (char) 0 : ' ');
     cs->fill((char *) to + length, diff, fill_char);
   }
+  return sort_field->length;
 }
 
 
-void
+uint
 Type_handler_int_result::make_sort_key(uchar *to, Item *item,
                                        const SORT_FIELD_ATTR *sort_field,
                                        Sort_param *param) const
@@ -1122,10 +1145,11 @@ Type_handler_int_result::make_sort_key(uchar *to, Item *item,
   longlong value= item->val_int_result();
   make_sort_key_longlong(to, item->maybe_null, item->null_value,
                          item->unsigned_flag, value);
+  return sort_field->length;
 }
 
 
-void
+uint
 Type_handler_temporal_result::make_sort_key(uchar *to, Item *item,
                                             const SORT_FIELD_ATTR *sort_field,
                                             Sort_param *param) const
@@ -1144,10 +1168,11 @@ Type_handler_temporal_result::make_sort_key(uchar *to, Item *item,
   else
     make_sort_key_longlong(to, item->maybe_null, false,
                            item->unsigned_flag, pack_time(&buf));
+  return sort_field->length;
 }
 
 
-void
+uint
 Type_handler_timestamp_common::make_sort_key(uchar *to, Item *item,
                                              const SORT_FIELD_ATTR *sort_field,
                                              Sort_param *param) const
@@ -1177,6 +1202,7 @@ Type_handler_timestamp_common::make_sort_key(uchar *to, Item *item,
     DBUG_ASSERT(native.length() == binlen);
     memcpy((char *) to, native.ptr(), binlen);
   }
+  return sort_field->length;
 }
 
 
@@ -1239,7 +1265,7 @@ Type_handler::make_sort_key_longlong_ext(uchar *to, bool maybe_null,
 }
 
 
-void
+uint
 Type_handler_decimal_result::make_sort_key(uchar *to, Item *item,
                                            const SORT_FIELD_ATTR *sort_field,
                                            Sort_param *param) const
@@ -1250,16 +1276,17 @@ Type_handler_decimal_result::make_sort_key(uchar *to, Item *item,
     if (item->null_value)
     {
       memset(to, 0, sort_field->length + 1);
-      return;
+      return sort_field->length;
     }
     *to++= 1;
   }
   dec_val->to_binary(to, item->max_length - (item->decimals ? 1 : 0),
                      item->decimals);
+  return sort_field->length;
 }
 
 
-void
+uint
 Type_handler_real_result::make_sort_key(uchar *to, Item *item,
                                         const SORT_FIELD_ATTR *sort_field,
                                         Sort_param *param) const
@@ -1270,11 +1297,12 @@ Type_handler_real_result::make_sort_key(uchar *to, Item *item,
     if (item->null_value)
     {
       memset(to, 0, sort_field->length + 1);
-      return;
+      return sort_field->length;
     }
     *to++= 1;
   }
   change_double_for_sort(value, to);
+  return sort_field->length;
 }
 
 
@@ -1287,6 +1315,7 @@ static uint make_sortkey(Sort_param *param, uchar *to, uchar *ref_pos)
   uint length;
   uchar *orig_to= to;
   uchar *end;
+  enum sort_method_t order_by_type= ORDER_BY_ORIGINAL;
 
   const bool using_packed_sortkeys= param->using_packed_sortkeys();
   if (using_packed_sortkeys)
@@ -1298,39 +1327,25 @@ static uint make_sortkey(Sort_param *param, uchar *to, uchar *ref_pos)
   {
     bool maybe_null=0;
     if ((field=sort_field->field))
-    {						// Field
-      if (using_packed_sortkeys)
-        end= field->make_packed_sort_key(to, sort_field->length);
-      else
-      {
-        field->make_sort_key(to, sort_field->length);
-        if ((maybe_null = field->maybe_null()))
-          to++;
-      }
+    {
+      // Field
+      length= field->make_sort_key(order_by_type, to, sort_field);
+      if (field->maybe_null())
+        to++;
     }
     else
     {						// Item
       Item *item= sort_field->item;
-      if (using_packed_sortkeys)
-        end= item->type_handler()->make_packed_sort_key(to, sort_field->item,
-                                                        sort_field, param);
-      else
-      {
-        item->type_handler()->make_sort_key(to, sort_field->item,
-                                            sort_field, param);
-        if ((maybe_null= sort_field->item->maybe_null))
-          to++;
-      }
+      length= item->type_handler()->make_sort_key(order_by_type, to,
+                                                  sort_field->item,
+                                                  sort_field, param);
+      if ((maybe_null= sort_field->item->maybe_null))
+        to++;
     }
 
-    if (using_packed_sortkeys)
-      to= end;
-    else
-    {
-      if (sort_field->reverse)
+    if (!using_packed_sortkeys && sort_field->reverse)
         reverse_key(to, maybe_null, sort_field);
-      to+= sort_field->length;
-    }
+    to+= length;
   }
 
   if (using_packed_sortkeys)
@@ -2096,8 +2111,24 @@ static uint suffix_length(ulong string_length)
 }
 
 
+void Type_handler::sort_length(THD *thd, enum sort_method_t order_by_type,
+                              const Type_std_attributes *item,
+                              SORT_FIELD_ATTR *attr)const
+{
+  switch (order_by_type)
+  {
+    case ORDER_BY_STRXFRM:
+      return sort_length(thd, item, attr);
+    case ORDER_BY_ORIGINAL:
+      return sort_length(thd, item, attr);
+    default:
+      DBUG_ASSERT(0);
+      break;
+  }
+}
+
 void
-Type_handler_string_result::sortlength(THD *thd,
+Type_handler_string_result::sort_length(THD *thd,
                                        const Type_std_attributes *item,
                                        SORT_FIELD_ATTR *sortorder) const
 {
@@ -2120,18 +2151,18 @@ Type_handler_string_result::sortlength(THD *thd,
 
 
 void
-Type_handler_temporal_result::sortlength(THD *thd,
-                                         const Type_std_attributes *item,
-                                         SORT_FIELD_ATTR *sortorder) const
+Type_handler_temporal_result::sort_length(THD *thd,
+                                          const Type_std_attributes *item,
+                                          SORT_FIELD_ATTR *sortorder) const
 {
   sortorder->original_length= sortorder->length= 8; // Sizof intern longlong
 }
 
 
 void
-Type_handler_timestamp_common::sortlength(THD *thd,
-                                          const Type_std_attributes *item,
-                                          SORT_FIELD_ATTR *sortorder) const
+Type_handler_timestamp_common::sort_length(THD *thd,
+                                           const Type_std_attributes *item,
+                                           SORT_FIELD_ATTR *sortorder) const
 {
   sortorder->length= my_timestamp_binary_length(item->decimals);
   sortorder->original_length= sortorder->length;
@@ -2139,7 +2170,7 @@ Type_handler_timestamp_common::sortlength(THD *thd,
 
 
 void
-Type_handler_int_result::sortlength(THD *thd,
+Type_handler_int_result::sort_length(THD *thd,
                                         const Type_std_attributes *item,
                                         SORT_FIELD_ATTR *sortorder) const
 {
@@ -2148,7 +2179,7 @@ Type_handler_int_result::sortlength(THD *thd,
 
 
 void
-Type_handler_real_result::sortlength(THD *thd,
+Type_handler_real_result::sort_length(THD *thd,
                                         const Type_std_attributes *item,
                                         SORT_FIELD_ATTR *sortorder) const
 {
@@ -2157,9 +2188,9 @@ Type_handler_real_result::sortlength(THD *thd,
 
 
 void
-Type_handler_decimal_result::sortlength(THD *thd,
-                                        const Type_std_attributes *item,
-                                        SORT_FIELD_ATTR *sortorder) const
+Type_handler_decimal_result::sort_length(THD *thd,
+                                         const Type_std_attributes *item,
+                                         SORT_FIELD_ATTR *sortorder) const
 {
   sortorder->length=
     my_decimal_get_binary_size(item->max_length - (item->decimals ? 1 : 0),
@@ -2195,6 +2226,7 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
   uint size_of_packable_fields=0;
   uint nullable_cols=0;
   bool allow_packing_for_sortkeys= true;
+  enum sort_method_t order_by_type= ORDER_BY_ORIGINAL;
 
   for (SORT_FIELD *sortorder= sort_keys->begin();
        sortorder != sort_keys->end();
@@ -2207,7 +2239,11 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
       Field *field= sortorder->field;
       CHARSET_INFO *cs= sortorder->field->sort_charset();
       sortorder->length= sortorder->field->sort_length();
-      sortorder->original_length= field->field_length;
+      sortorder->original_length= sortorder->length;
+
+      if (sortorder->original_length > thd->variables.max_sort_length)
+        allow_packing_for_sortkeys= false;
+
       if (use_strnxfrm((cs=sortorder->field->sort_charset())))
       {
         *multi_byte_charset= true;
@@ -2221,15 +2257,18 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
     }
     else
     {
-      sortorder->item->type_handler()->sortlength(thd, sortorder->item,
-                                                  sortorder);
+      sortorder->item->type_handler()->sort_length(thd, order_by_type,
+                                                   sortorder->item,
+                                                   sortorder);
       if (use_strnxfrm(sortorder->item->collation.collation))
       {
         *multi_byte_charset= true;
       }
       if (sortorder->item->type_handler()->is_packable())
+      {
         sortorder->length_bytes=
            number_storage_requirement(sortorder->original_length);
+      }
 
       if (sortorder->item->maybe_null)
         nullable_cols++;				// Place for NULL marker
