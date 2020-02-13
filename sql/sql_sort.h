@@ -301,6 +301,21 @@ public:
     return size_of_length_field + uint4korr(p);
   }
 
+  void increment_size_of_packable_fields(uint len)
+  {
+    size_of_packable_fields+= len;
+  }
+
+  void increment_original_sort_length(uint len)
+  {
+    sort_length+= len;
+  }
+
+  void allow_packing_for_sort_keys(bool val)
+  {
+    m_using_packed_sortkeys= false;
+  }
+
   static const uint size_of_length_field= 4;
 
 private:

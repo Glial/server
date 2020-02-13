@@ -2194,6 +2194,7 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
   length=0;
   uint size_of_packable_fields=0;
   uint nullable_cols=0;
+  bool allow_packing_for_sortkeys= true;
 
   for (SORT_FIELD *sortorder= sort_keys->begin();
        sortorder != sort_keys->end();
@@ -2236,11 +2237,10 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
     set_if_smaller(sortorder->length, thd->variables.max_sort_length);
     length+=sortorder->length;
 
-    size_of_packable_fields+= sortorder->length_bytes;
-    original_sort_length+= sortorder->original_length;
+    sort_keys->increment_size_of_packable_fields(sortorder->length_bytes);
+    sort_keys->increment_original_sort_length(sortorder->original_length);
   }
-  sort_keys->set_size_of_packable_fields(size_of_packable_fields);
-  sort_keys->set_sort_length(original_sort_length+nullable_cols);
+  sort_keys->allow_packing_for_sort_keys(allow_packing_for_sortkeys);
   DBUG_PRINT("info",("sort_length: %d",length));
   return length+nullable_cols;
 }
