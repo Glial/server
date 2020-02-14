@@ -63,6 +63,8 @@ static Addon_fields *get_addon_fields(TABLE *table, uint sortlength,
 static bool check_if_pq_applicable(Sort_param *param, SORT_INFO *info,
                                    TABLE *table,
                                    ha_rows records, size_t memory_available);
+static bool check_if_packing_possible(THD *thd, CHARSET_INFO *cs,
+                                      const SORT_FIELD_ATTR *sort_field);
 
 
 void Sort_param::init_for_filesort(uint sortlen, TABLE *table,
@@ -2245,10 +2247,8 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset,
       Field *field= sortorder->field;
       CHARSET_INFO *cs= sortorder->field->sort_charset();
       sortorder->length= sortorder->field->sort_length();
+      sortorder->suffix_length= sortorder->field->suffix_length();
       sortorder->original_length= sortorder->length;
-
-      if (sortorder->original_length > thd->variables.max_sort_length)
-        *allow_packing_for_sortkeys= false;
 
       if (use_strnxfrm((cs=sortorder->field->sort_charset())))
       {
@@ -2256,30 +2256,40 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset,
         sortorder->length= (uint) cs->strnxfrmlen(sortorder->length);
       }
       if (field->is_packable())
-        sortorder->length_bytes= number_storage_requirement(field->field_length);
+      {
+        sortorder->length_bytes=
+          number_storage_requirement(sortorder->original_length);
+        *allow_packing_for_sortkeys= check_if_packing_possible(thd, cs,
+                                                               sortorder);
+      }
 
       if (sortorder->field->maybe_null())
         nullable_cols++;				// Place for NULL marker
     }
     else
     {
+      CHARSET_INFO *cs;
       sortorder->item->type_handler()->sort_length(thd, order_by_type,
                                                    sortorder->item,
                                                    sortorder);
-      if (use_strnxfrm(sortorder->item->collation.collation))
+      if (use_strnxfrm((cs=sortorder->item->collation.collation)))
       {
         *multi_byte_charset= true;
       }
+
       if (sortorder->item->type_handler()->is_packable())
       {
         sortorder->length_bytes=
            number_storage_requirement(sortorder->original_length);
+        *allow_packing_for_sortkeys= check_if_packing_possible(thd, cs,
+                                                               sortorder);
       }
 
       if (sortorder->item->maybe_null)
         nullable_cols++;				// Place for NULL marker
     }
     set_if_smaller(sortorder->length, thd->variables.max_sort_length);
+    set_if_smaller(sortorder->original_length, thd->variables.max_sort_length);
     length+=sortorder->length;
 
     sort_keys->increment_size_of_packable_fields(sortorder->length_bytes);
@@ -2844,8 +2854,8 @@ int compare_packed_keys_ext(CHARSET_INFO *cs, uchar *a, size_t *a_len,
 
   if (!retval && sort_field->suffix_length)
   {
-    a=a + sort_field->length_bytes+a_length - sort_field->suffix_length;
-    b=b + sort_field->length_bytes+b_length - sort_field->suffix_length;
+    a= a + sort_field->length_bytes + a_length - sort_field->suffix_length;
+    b= b + sort_field->length_bytes + b_length - sort_field->suffix_length;
     retval= memcmp(a, b, sort_field->suffix_length);
   }
 
@@ -2938,4 +2948,15 @@ void reverse_key(uchar *to, bool maybe_null, const SORT_FIELD_ATTR *sort_field)
     *to = (uchar) (~ *to);
     to++;
   }
+}
+
+
+bool check_if_packing_possible(THD *thd, CHARSET_INFO *cs,
+                               const SORT_FIELD_ATTR *sortorder)
+{
+  if (sortorder->original_length > thd->variables.max_sort_length &&
+      cs->mbmaxlen() != 1)
+    return false;
+  return true;
+
 }

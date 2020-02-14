@@ -1132,7 +1132,23 @@ Field_varstring::pack_sort_string(uchar *to, uint max_length,
 uchar *
 Field_blob::pack_sort_string(uchar *to, uint max_length, uint suffix_length)
 {
-  return to;
+  String buf;
+  val_str(&buf, &buf);
+  uint length, data_length;
+  length= MY_MIN(buf.length(), max_length);
+  data_length= length - suffix_length;
+
+  if (field_charset() == &my_charset_bin && suffix_length)
+    // suffix length stored in bigendian form
+    store_bigendian(buf.length(), to + data_length, suffix_length);
+
+  // length stored in lowendian form
+  store_lowendian(length, to, packlength);
+  to+= packlength;
+  // copying data length bytes to the buffer
+  memcpy(to, buf.ptr(), data_length);
+  return to+length;
+
 }
 
 
@@ -8612,8 +8628,13 @@ uint32 Field_blob::sort_length() const
 {
   return packlength == 4 ?
     UINT_MAX32 :
-    (uint32) field_length + (field_charset() == &my_charset_bin ?
-                             0 : packlength);
+    (uint32) field_length + suffix_length();
+}
+
+
+uint32 Field_blob::suffix_length() const
+{
+  return field_charset() == &my_charset_bin ?  packlength : 0;
 }
 
 

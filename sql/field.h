@@ -1075,6 +1075,7 @@ public:
   */
   virtual uint32 data_length() { return pack_length(); }
   virtual uint32 sort_length() const { return pack_length(); }
+  virtual uint32 suffix_length() const { return 0; }
 
   /* 
     Get the number bytes occupied by the value in the field.
@@ -4064,8 +4065,11 @@ public:
   uint32 key_length() const override { return (uint32) field_length; }
   uint32 sort_length() const override
   {
-    return (uint32) field_length + (field_charset() == &my_charset_bin ?
-                                    length_bytes : 0);
+    return (uint32) field_length + suffix_length();
+  }
+  virtual uint32 suffix_length() const override
+  {
+    return (field_charset() == &my_charset_bin ? length_bytes : 0);
   }
   Copy_func *get_copy_func(const Field *from) const override;
   bool memcpy_field_possible(const Field *from) const override;
@@ -4400,6 +4404,7 @@ public:
   { return (uint32) (packlength); }
   uint row_pack_length() const override { return pack_length_no_ptr(); }
   uint32 sort_length() const override;
+  uint32 suffix_length() const override;
   uint32 value_length() override { return get_length(); }
   virtual uint32 max_data_length() const override
   {
