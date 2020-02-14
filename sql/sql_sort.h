@@ -449,6 +449,10 @@ public:
       *recl= static_cast<uint>(record_end - record_start);
   }
   void try_to_pack_sortkeys();
+  enum sort_method_t order_by_strategy()
+  {
+    return using_packed_sortkeys() ? ORDER_BY_ORIGINAL :ORDER_BY_STRXFRM;
+  }
 
 private:
   uint m_packable_length;

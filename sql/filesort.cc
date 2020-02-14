@@ -1055,14 +1055,14 @@ Type_handler::make_sort_key(enum sort_method_t order_by_type, uchar *to,
                             Item *item, const SORT_FIELD_ATTR *sort_field,
                             Sort_param *param) const
 {
+  uchar *end=NULL;
   switch (order_by_type)
   {
     case ORDER_BY_STRXFRM:
-      make_sort_key(to, item, sort_field, param);
-      break;
+      return make_sort_key(to, item, sort_field, param);
     case ORDER_BY_ORIGINAL:
-      make_packed_sort_key(to, item, sort_field, param);
-      break;
+      end= make_packed_sort_key(to, item, sort_field, param);
+      return static_cast<uint>(end - to);
     default:
       DBUG_ASSERT(0);
       break;
@@ -1322,7 +1322,7 @@ static uint make_sortkey(Sort_param *param, uchar *to, uchar *ref_pos)
   uint length;
   uchar *orig_to= to;
   uchar *end;
-  enum sort_method_t order_by_type= ORDER_BY_ORIGINAL;
+  enum sort_method_t order_by_type= param->order_by_strategy();
 
   const bool using_packed_sortkeys= param->using_packed_sortkeys();
   if (using_packed_sortkeys)
@@ -1337,7 +1337,7 @@ static uint make_sortkey(Sort_param *param, uchar *to, uchar *ref_pos)
     {
       // Field
       length= field->make_sort_key(order_by_type, to, sort_field);
-      if (field->maybe_null())
+      if ((maybe_null= field->maybe_null()))
         to++;
     }
     else
@@ -2955,7 +2955,7 @@ bool check_if_packing_possible(THD *thd, CHARSET_INFO *cs,
                                const SORT_FIELD_ATTR *sortorder)
 {
   if (sortorder->original_length > thd->variables.max_sort_length &&
-      cs->mbmaxlen() != 1)
+      cs->state & MY_CS_NON1TO1)
     return false;
   return true;
 
