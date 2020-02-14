@@ -1422,7 +1422,8 @@ public:
     create a compact sort key which can be compared with a comparison
     function. They are called packed sort keys
   */
-  virtual uint make_packed_sort_key(uchar *buff, uint length);
+  virtual uint make_packed_sort_key(uchar *buff, uint max_length,
+                                    uint suffix_length);
   virtual int compare_packed_keys(uchar *a, size_t *a_len,
                                   uchar *b, size_t *b_len,
                                   SORT_FIELD *sortorder) const;
@@ -2159,7 +2160,9 @@ public:
   int compare_packed_keys(uchar *a, size_t *a_len,
                           uchar *b, size_t *b_len,
                           SORT_FIELD *sortorder)const override;
-  uint make_packed_sort_key(uchar *buff, uint length)override;
+  uint make_packed_sort_key(uchar *buff, uint max_length,
+                            uint suffix_length)override;
+  virtual uchar* pack_sort_string(uchar *to, uint length, uint suffix_length);
 };
 
 /* base class for float and double and decimal (old one) */
@@ -4115,6 +4118,7 @@ public:
   uint length_size() const override { return length_bytes; }
   void print_key_value(String *out, uint32 length) override;
   Binlog_type_info binlog_type_info() const override;
+  uchar* pack_sort_string(uchar *to, uint length, uint suffix_length)override;
 };
 
 
@@ -4512,6 +4516,7 @@ public:
   }
   void print_key_value(String *out, uint32 length) override;
   Binlog_type_info binlog_type_info() const override;
+  uchar* pack_sort_string(uchar *to, uint length, uint suffix_length)override;
 
   friend void TABLE::remember_blob_values(String *blob_storage);
   friend void TABLE::restore_blob_values(String *blob_storage);

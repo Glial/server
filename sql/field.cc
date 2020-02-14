@@ -1050,7 +1050,8 @@ Field::make_sort_key(enum sort_method_t order_by_type,
     case ORDER_BY_STRXFRM:
       return make_sort_key(buff, sort_field->length);
     case ORDER_BY_ORIGINAL:
-      return make_packed_sort_key(buff, sort_field->length);
+      return make_packed_sort_key(buff, sort_field->length,
+                                  sort_field->suffix_length);
     default:
       DBUG_ASSERT(0);
       break;
@@ -1058,7 +1059,8 @@ Field::make_sort_key(enum sort_method_t order_by_type,
   return 0;
 }
 
-uint Field::make_packed_sort_key(uchar *buff,uint length)
+uint Field::make_packed_sort_key(uchar *buff,uint max_length,
+                                 uint suffix_length  __attribute__((unused)))
 {
   if (maybe_null())
   {
@@ -1069,12 +1071,13 @@ uint Field::make_packed_sort_key(uchar *buff,uint length)
     }
     *buff++=1;
   }
-  sort_string(buff, length);
-  return length;
+  sort_string(buff, max_length);
+  return max_length;
 }
 
 
-uint Field_longstr::make_packed_sort_key(uchar *buff, uint length)
+uint Field_longstr::make_packed_sort_key(uchar *buff, uint max_length,
+                                         uint suffix_length)
 {
   if (maybe_null())
   {
@@ -1085,9 +1088,30 @@ uint Field_longstr::make_packed_sort_key(uchar *buff, uint length)
     }
     *buff++=1;
   }
-  uchar *end= pack(buff, ptr);
+  uchar *end= pack_sort_string(buff, max_length, suffix_length);
   return static_cast<int>(end-buff);
 }
+
+
+uchar*
+Field_longstr::pack_sort_string(uchar *to, uint length, uint suffix_length)
+{
+  DBUG_ASSERT(suffix_length == 0);
+  return pack(to, ptr, length);
+}
+
+uchar *
+Field_varstring::pack_sort_string(uchar *to, uint length, uint suffix_length)
+{
+  return to;
+}
+
+uchar *
+Field_blob::pack_sort_string(uchar *to, uint length, uint suffix_length)
+{
+  return to;
+}
+
 
 /**
   @brief
