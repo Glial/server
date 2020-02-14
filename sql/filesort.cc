@@ -54,7 +54,8 @@ static bool save_index(Sort_param *param, uint count,
                        SORT_INFO *table_sort);
 static uint suffix_length(ulong string_length);
 static uint sortlength(THD *thd, Sort_keys *sortorder,
-                       bool *multi_byte_charset);
+                       bool *multi_byte_charset,
+                       bool *allow_packing_for_sortkeys);
 static Addon_fields *get_addon_fields(TABLE *table, uint sortlength,
                                       uint *addon_length,
                                       uint *m_packable_length);
@@ -172,7 +173,7 @@ SORT_INFO *filesort(THD *thd, TABLE *table, Filesort *filesort,
   ha_rows num_rows= HA_POS_ERROR;
   IO_CACHE tempfile, buffpek_pointers, *outfile; 
   Sort_param param;
-  bool multi_byte_charset;
+  bool multi_byte_charset, allow_packing_for_sortkeys;
   Bounded_queue<uchar, uchar> pq;
   SQL_SELECT *const select= filesort->select;
   ha_rows max_rows= filesort->limit;
@@ -220,8 +221,10 @@ SORT_INFO *filesort(THD *thd, TABLE *table, Filesort *filesort,
   sort->found_rows= HA_POS_ERROR;
 
   param.sort_keys= sort_keys;
-  param.init_for_filesort(sortlength(thd, sort_keys, &multi_byte_charset),
-                          table, max_rows, filesort->sort_positions);
+  uint sort_len= sortlength(thd, sort_keys, &multi_byte_charset,
+                            &allow_packing_for_sortkeys);
+
+  param.init_for_filesort(sort_len, table, max_rows, filesort->sort_positions);
 
   sort->addon_fields=  param.addon_fields;
   sort->sort_keys= param.sort_keys;
@@ -271,7 +274,9 @@ SORT_INFO *filesort(THD *thd, TABLE *table, Filesort *filesort,
   {
     DBUG_PRINT("info", ("filesort PQ is not applicable"));
 
-    param.try_to_pack_sortkeys();
+    if (allow_packing_for_sortkeys)
+      param.try_to_pack_sortkeys();
+
     param.try_to_pack_addons(thd->variables.max_length_for_sort_data);
     param.using_pq= false;
 
@@ -2216,16 +2221,17 @@ Type_handler_decimal_result::sort_length(THD *thd,
 */
 
 static uint
-sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
+sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset,
+           bool *allow_packing_for_sortkeys)
 {
   uint length;
   uint original_sort_length=0;
   *multi_byte_charset= 0;
+  *allow_packing_for_sortkeys= true;
 
   length=0;
   uint size_of_packable_fields=0;
   uint nullable_cols=0;
-  bool allow_packing_for_sortkeys= true;
   enum sort_method_t order_by_type= ORDER_BY_ORIGINAL;
 
   for (SORT_FIELD *sortorder= sort_keys->begin();
@@ -2242,7 +2248,7 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
       sortorder->original_length= sortorder->length;
 
       if (sortorder->original_length > thd->variables.max_sort_length)
-        allow_packing_for_sortkeys= false;
+        *allow_packing_for_sortkeys= false;
 
       if (use_strnxfrm((cs=sortorder->field->sort_charset())))
       {
@@ -2279,7 +2285,6 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset)
     sort_keys->increment_size_of_packable_fields(sortorder->length_bytes);
     sort_keys->increment_original_sort_length(sortorder->original_length);
   }
-  sort_keys->allow_packing_for_sort_keys(allow_packing_for_sortkeys);
   DBUG_PRINT("info",("sort_length: %d",length));
   return length+nullable_cols;
 }

@@ -311,11 +311,6 @@ public:
     sort_length+= len;
   }
 
-  void allow_packing_for_sort_keys(bool val)
-  {
-    m_using_packed_sortkeys= false;
-  }
-
   static const uint size_of_length_field= 4;
 
 private:
