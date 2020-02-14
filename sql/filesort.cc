@@ -2829,11 +2829,21 @@ int compare_packed_keys_ext(CHARSET_INFO *cs, uchar *a, size_t *a_len,
   a_length= read_length(a, sort_field->length_bytes);
   b_length= read_length(b, sort_field->length_bytes);
 
-  retval= cs->strnncollsp(a + sort_field->length_bytes, a_length,
-                          b + sort_field->length_bytes, b_length);
-
   *a_len+= sort_field->length_bytes + a_length;
   *b_len+= sort_field->length_bytes + b_length;
+
+  retval= cs->strnncollsp(a + sort_field->length_bytes,
+                          a_length - sort_field->suffix_length,
+                          b + sort_field->length_bytes,
+                          b_length - sort_field->suffix_length);
+
+  if (!retval && sort_field->suffix_length)
+  {
+    a=a + sort_field->length_bytes+a_length - sort_field->suffix_length;
+    b=b + sort_field->length_bytes+b_length - sort_field->suffix_length;
+    retval= memcmp(a, b, sort_field->suffix_length);
+  }
+
   return retval;
 }
 
