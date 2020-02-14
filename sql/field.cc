@@ -1094,20 +1094,43 @@ uint Field_longstr::make_packed_sort_key(uchar *buff, uint max_length,
 
 
 uchar*
-Field_longstr::pack_sort_string(uchar *to, uint length, uint suffix_length)
+Field_longstr::pack_sort_string(uchar *to, uint max_length, uint suffix_length)
 {
-  DBUG_ASSERT(suffix_length == 0);
-  return pack(to, ptr, length);
+  String buf;
+  val_str(&buf, &buf);
+
+  uint length= MY_MIN(buf.length(), max_length);
+  uint length_bytes= field_length > 255 ? 2 : 1;
+  store_lowendian(length, to, length_bytes);
+  to+= length_bytes;
+  memcpy(to, buf.ptr(), length);
+  return to+length;
 }
 
 uchar *
-Field_varstring::pack_sort_string(uchar *to, uint length, uint suffix_length)
+Field_varstring::pack_sort_string(uchar *to, uint max_length,
+                                  uint suffix_length)
 {
-  return to;
+  String buf;
+  val_str(&buf, &buf);
+  uint length, data_length;
+  length= MY_MIN(buf.length(), max_length);
+  data_length= length - suffix_length;
+
+  if (field_charset() == &my_charset_bin && suffix_length)
+    // suffix length stored in bigendian form
+    store_bigendian(buf.length(), to + data_length, suffix_length);
+
+  // length stored in lowendian form
+  store_lowendian(length, to, length_bytes);
+  to+= length_bytes;
+  // copying data length bytes to the buffer
+  memcpy(to, buf.ptr(), data_length);
+  return to+length;
 }
 
 uchar *
-Field_blob::pack_sort_string(uchar *to, uint length, uint suffix_length)
+Field_blob::pack_sort_string(uchar *to, uint max_length, uint suffix_length)
 {
   return to;
 }
