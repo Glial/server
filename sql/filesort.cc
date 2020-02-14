@@ -2591,14 +2591,35 @@ Type_handler_string_result::make_packed_sort_key(uchar *to, Item *item,
     }
   }
 
-  /* Length always stored little-endian */
-  store_lowendian(static_cast<ulonglong>(res->length()), to,
-                  sort_field->length_bytes);
-  to+=sort_field->length_bytes;
-  /* Store bytes of string */
-  memcpy(to, (uchar*)res->ptr(), res->length());
-  return to + res->length();
-}
+  if (cs == &my_charset_bin)
+  {
+    uint data_length;
+    data_length= sort_field->original_length - sort_field->suffix_length;
+
+    uint length= res->length();
+    set_if_smaller(data_length, length);
+
+    store_bigendian(length, to+data_length, sort_field->suffix_length);
+    /* Length always stored little-endian */
+    store_lowendian(data_length + sort_field->suffix_length, to,
+                    sort_field->length_bytes);
+    to+= sort_field->length_bytes;
+    /* Store bytes of string */
+    memcpy(to, (uchar*)res->ptr(), data_length);
+    return to + data_length + sort_field->suffix_length;
+  }
+  else
+  {
+    uint length= res->length();
+    set_if_smaller(length, sort_field->original_length);
+    /* Length always stored little-endian */
+    store_lowendian(length, to, sort_field->length_bytes);
+    to+= sort_field->length_bytes;
+    /* Store bytes of string */
+    memcpy(to, (uchar*)res->ptr(), length);
+    return to+length;
+  }
+ }
 
 
 uchar*

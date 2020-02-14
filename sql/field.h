@@ -1416,7 +1416,7 @@ public:
   */
   uint make_sort_key(uchar *buff, uint length);
   uint make_sort_key(enum sort_method_t order_by_type,
-                     uchar *buff, uint length);
+                     uchar *buff, SORT_FIELD_ATTR *sort_field);
 
   /*
     create a compact sort key which can be compared with a comparison
