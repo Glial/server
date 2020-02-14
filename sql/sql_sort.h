@@ -449,7 +449,7 @@ public:
   void get_rec_and_res_len(uchar *record_start, uint *recl, uint *resl)
   {
     uint sort_length= get_sort_length(record_start);
-    uint addon_length= get_addon_length(record_start+addon_length);
+    uint addon_length= get_addon_length(record_start + sort_length);
     *recl= sort_length + addon_length;
     *resl= using_addon_fields() ? addon_length : res_length;
   }
