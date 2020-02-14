@@ -2246,6 +2246,8 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset,
       sortorder->length= sortorder->field->sort_length();
       sortorder->suffix_length= sortorder->field->suffix_length();
       sortorder->original_length= sortorder->length;
+      set_if_smaller(sortorder->original_length,
+                     thd->variables.max_sort_length);
 
       if (use_strnxfrm((cs=sortorder->field->sort_charset())))
       {
@@ -2273,7 +2275,8 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset,
       {
         *multi_byte_charset= true;
       }
-
+      set_if_smaller(sortorder->original_length,
+                     thd->variables.max_sort_length);
       if (sortorder->item->type_handler()->is_packable())
       {
         sortorder->length_bytes=
@@ -2285,7 +2288,6 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset,
       if (sortorder->item->maybe_null)
         nullable_cols++;				// Place for NULL marker
     }
-    set_if_smaller(sortorder->length, thd->variables.max_sort_length);
     set_if_smaller(sortorder->original_length, thd->variables.max_sort_length);
     length+=sortorder->length;
 

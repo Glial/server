@@ -1050,7 +1050,7 @@ Field::make_sort_key(enum sort_method_t order_by_type,
     case ORDER_BY_STRXFRM:
       return make_sort_key(buff, sort_field->length);
     case ORDER_BY_ORIGINAL:
-      return make_packed_sort_key(buff, sort_field->length,
+      return make_packed_sort_key(buff, sort_field->original_length,
                                   sort_field->suffix_length);
     default:
       DBUG_ASSERT(0);
@@ -1114,19 +1114,25 @@ Field_varstring::pack_sort_string(uchar *to, uint max_length,
   String buf;
   val_str(&buf, &buf);
   uint length, data_length;
-  length= MY_MIN(buf.length(), max_length);
-  data_length= length - suffix_length;
+  length= buf.length();
 
-  if (field_charset() == &my_charset_bin && suffix_length)
-    // suffix length stored in bigendian form
-    store_bigendian(buf.length(), to + data_length, suffix_length);
+  if (length + suffix_length <= max_length)
+    data_length= length;
+  else
+    data_length= max_length - suffix_length;
 
   // length stored in lowendian form
-  store_lowendian(length, to, length_bytes);
+  store_lowendian(data_length + suffix_length, to, length_bytes);
   to+= length_bytes;
   // copying data length bytes to the buffer
   memcpy(to, buf.ptr(), data_length);
-  return to+length;
+  to+= data_length;
+
+  if (field_charset() == &my_charset_bin && suffix_length)
+    // suffix length stored in bigendian form
+    store_bigendian(buf.length(), to, suffix_length);
+
+  return to + suffix_length;
 }
 
 uchar *
@@ -1134,20 +1140,27 @@ Field_blob::pack_sort_string(uchar *to, uint max_length, uint suffix_length)
 {
   String buf;
   val_str(&buf, &buf);
-  uint length, data_length;
-  length= MY_MIN(buf.length(), max_length);
-  data_length= length - suffix_length;
 
-  if (field_charset() == &my_charset_bin && suffix_length)
-    // suffix length stored in bigendian form
-    store_bigendian(buf.length(), to + data_length, suffix_length);
+  uint length, data_length;
+  length= buf.length();
+
+  if (length + suffix_length <= max_length)
+    data_length= length;
+  else
+    data_length= max_length - suffix_length;
 
   // length stored in lowendian form
-  store_lowendian(length, to, packlength);
+  store_lowendian(data_length + suffix_length, to, packlength);
   to+= packlength;
   // copying data length bytes to the buffer
   memcpy(to, buf.ptr(), data_length);
-  return to+length;
+  to+= data_length;
+
+  if (field_charset() == &my_charset_bin && suffix_length)
+    // suffix length stored in bigendian form
+    store_bigendian(buf.length(), to, suffix_length);
+
+  return to + suffix_length;
 
 }
 
