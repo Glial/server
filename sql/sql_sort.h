@@ -413,10 +413,17 @@ public:
 
   uint32 get_result_length(uchar *plen)
   {
+    if (!using_addon_fields())
+      return res_length;
+    return get_addon_length(plen);
+  }
+
+  uint32 get_addon_length(uchar *plen)
+  {
     if (using_packed_addons())
       return Addon_fields::read_addon_length(plen);
     else
-      return res_length;
+      return addon_length;
   }
 
   uint32 get_sort_length(uchar *plen)
@@ -427,10 +434,10 @@ public:
       return sort_length;
   }
 
-  uint32 get_record_length(uchar *plen)
+  uint get_record_length(uchar *plen)
   {
-    uint32 sort_length= get_sort_length(plen);
-    return sort_length + get_result_length(plen + sort_length);
+    uint sort_length= get_sort_length(plen);
+    return sort_length + get_addon_length(plen + sort_length);
   }
 
   /**
@@ -441,12 +448,10 @@ public:
    */
   void get_rec_and_res_len(uchar *record_start, uint *recl, uint *resl)
   {
-      uint sort_length= get_sort_length(record_start);
-      uchar *plen= record_start + sort_length;
-      *resl= get_result_length(plen);
-      DBUG_ASSERT(*resl <= res_length);
-      const uchar *record_end= plen + *resl;
-      *recl= static_cast<uint>(record_end - record_start);
+    uint sort_length= get_sort_length(record_start);
+    uint addon_length= get_addon_length(record_start+addon_length);
+    *recl= sort_length + addon_length;
+    *resl= using_addon_fields() ? addon_length : res_length;
   }
   void try_to_pack_sortkeys();
   enum sort_method_t order_by_strategy()

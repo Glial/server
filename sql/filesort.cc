@@ -1321,7 +1321,6 @@ static uint make_sortkey(Sort_param *param, uchar *to, uchar *ref_pos)
   SORT_FIELD *sort_field;
   uint length;
   uchar *orig_to= to;
-  uchar *end;
   enum sort_method_t order_by_type= param->order_by_strategy();
 
   const bool using_packed_sortkeys= param->using_packed_sortkeys();
@@ -2227,12 +2226,10 @@ sortlength(THD *thd, Sort_keys *sort_keys, bool *multi_byte_charset,
            bool *allow_packing_for_sortkeys)
 {
   uint length;
-  uint original_sort_length=0;
   *multi_byte_charset= 0;
   *allow_packing_for_sortkeys= true;
 
   length=0;
-  uint size_of_packable_fields=0;
   uint nullable_cols=0;
   enum sort_method_t order_by_type= ORDER_BY_ORIGINAL;
 
